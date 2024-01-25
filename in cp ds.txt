@@ -1,0 +1,17 @@
+0-System
+1-Redef [done]
+2-Memory [done]
+3-Array [done]
+4-Char [done]
+5-List
+6-Graph
+7-Heap
+8-LinkedList
+9-Map
+10-Set
+11-Queue
+12-Stack
+13-String [done]
+14-Tree
+15-Hash
+16-Table
