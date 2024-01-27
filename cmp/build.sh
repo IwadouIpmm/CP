@@ -1,9 +1,9 @@
 cd lnx
 
-sh redef.bat
-sh char.bat
-sh string.bat
-sh memory.bat
-sh array.bat
+sh redef.sh
+sh char.sh
+sh memory.sh
+sh string.sh
+sh array.sh
 
 cd ..
