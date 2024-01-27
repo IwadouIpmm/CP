@@ -27,6 +27,13 @@ extern "C" {
     bool freeAll (void);
 
     /*
+     * INPT: A gptr.
+     * OTPT: Returns true on success, otherwise returns false on failure.
+     * INFO: This function is used to deallocate an allocated object from Malloc or Calloc function.
+    */
+    bool Free (gptr address);
+
+    /*
      * INPT: A pointer to a memory segment.
      * OTPT: Returns true on success, otherwise returns false on failure.
      * INFO: This function is used to deallocate a specific memory segment.
@@ -165,13 +172,6 @@ extern "C" {
      * INFO: This function is used to disable const flag of a memory segment.
     */
     bool disableConstFlag (memory * segment);
-
-    /*
-     * INPT: A pointer to gptr and an enum dt value (tells us which datatype we are dealing with).
-     * OTPT: Returns true on success, otherwise returns false on failure.
-     * INFO: This function is used to deallocate an allocated object from mAlloc function.
-    */
-    bool Free (gptr * address, enum dt type);
 
     /*
      * INPT: A pointer to a memory segment.

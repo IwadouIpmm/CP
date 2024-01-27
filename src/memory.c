@@ -64,9 +64,10 @@ static bool initializeBlocks (void) {
         return true;
     }
 
+    ucar limiter = 0;
     bool result = false;
 
-    blocks = (memoryManager *) Malloc ((sizt) sizeof (memoryManager));
+    do {++limiter; blocks = (memoryManager *) malloc (sizeof (memoryManager));} while (limiter < 3 && !blocks);
 
     if (blocks) {
         blocks -> length = 0;
@@ -90,8 +91,8 @@ static sizt findEmptySegment (void) {
     sizt index = 0;
 
     if (blocks -> length == 0) {
-        blocks -> length = 10;
-        blocks -> segments = (memory *) Malloc (sizeof (memory) * 10);
+        ucar limiter = 0;
+        do {++limiter; blocks -> segments = (memory *) malloc (sizeof (memory) * 10);} while (limiter < 3 && !blocks -> segments);
 
         if (!blocks -> segments) {
             return -1;
@@ -102,6 +103,8 @@ static sizt findEmptySegment (void) {
         for (; iteration < 10; ++iteration) {
             blocks -> segments [iteration] = NULL;
         }
+
+        blocks -> length = 10;
 
         return 0;
     }
@@ -117,7 +120,10 @@ static sizt findEmptySegment (void) {
 
     //Check there is no empty space found, then extends the array of memory segments in our memory manager.
     if (!found) {
-        memory * segments = (memory *) Malloc ((sizeof (memory) * (blocks -> length + 5)));
+        ucar limiter = 0;
+        memory * segments = NULL;
+
+        do {++limiter; segments = (memory *) malloc ((sizeof (memory) * (blocks -> length + 5)));} while (limiter < 3 && !segments);
 
         if (!segments) {
             return -1;
@@ -214,10 +220,9 @@ static sizt performMemoryOperation (memory * segment, uint operationCode, gptr *
     }
 
     if (operationCode == 1) {
-        result = (*type == STRG || *type == STRING) ? 0 : typeLength (*type);
-        blocks -> segments [index] -> value = (*type == STRG || *type == STRING) ? NULL : Malloc (result);
+        blocks -> segments [index] -> value = (*type == STRG || *type == STRING) ? NULL : Malloc (*type, 1);
 
-        if (*type >= BOOLEAN && *type <= LDBL) {
+        if (*type != STRG && *type != STRING) {
             if (!blocks -> segments [index] -> value) {
                 return 0;
             } 
@@ -253,7 +258,7 @@ static sizt performMemoryOperation (memory * segment, uint operationCode, gptr *
 
     if (operationCode == 6 && (*type >= BOOLEAN && *type <= LDBL) && (isMemoryWritable (*segment) && !isMemoryConstant (*segment))) {
         if (blocks -> segments [index] -> type != *type) {
-            temp = Malloc (typeLength (*type));
+            temp = Malloc (GPTR, 1);
 
             if (!temp) {
                 return result;
@@ -687,7 +692,7 @@ static sizt performMemoryOperation (memory * segment, uint operationCode, gptr *
                 case 6:
                     if (isMemoryWritable (*segment) && !isMemoryConstant (*segment)) {
                         result = stringLength (((strg) args [1]));
-                        temp = (!result) ? NULL : Malloc ((result + 1));
+                        temp = (!result) ? NULL : Malloc (CHAR, (result + 1));
 
                         if (result) {
                             ((strg) temp) [result] = '\0';
@@ -796,40 +801,35 @@ static sizt performMemoryOperation (memory * segment, uint operationCode, gptr *
                             break;
                         }
 
-                        holder = ((memory) Malloc (typeLength (*type)));
+                        blocks -> segments [result] = (memory) malloc (sizeof (struct _mem_));
 
-                        if (!holder) {
+                        if (!blocks -> segments [result]) {
                             result = 0;
                             break;
                         }
 
-                        holder -> value = NULL;
-                        holder -> type = ((memory) args [1]) -> type;
-                        holder -> attrib = MEM_READ | MEM_WRITE | MEM_MUTABLE | MEM_DEFVAL | MEM_SHRINK | MEM_EXTEND;
+                        blocks -> segments [result] -> value = NULL;
+                        blocks -> segments [result] -> type = ((memory) args [1]) -> type;
+                        blocks -> segments [result] -> attrib = MEM_READ | MEM_WRITE | MEM_MUTABLE | MEM_DEFVAL | MEM_SHRINK | MEM_EXTEND;
 
-                        blocks -> segments [result] = holder;
-
-                        if (!performMemoryOperation (&holder, 6, (gptr []) {(gptr) &(((memory) ((memory) args [1]) -> value) -> type), ((memory) ((memory) args [1]) -> value) -> value})) {
+                        if (!performMemoryOperation (&blocks -> segments [result], 6, (gptr []) {(gptr) &(((memory) ((memory) args [1]) -> value) -> type), ((memory) ((memory) args [1]) -> value) -> value})) {
+                            free (blocks -> segments [result]);
                             blocks -> segments [result] = NULL;
                             result = 0;
-                            free (holder);
-                            holder = NULL;
                             break;
                         }
 
                         if ((*segment) -> value) {
                             if (!performMemoryOperation (segment, 5, NULL)) {
-                                performMemoryOperation(&holder, 2, NULL);
-                                holder = NULL;
-                                result = 0;
+                                performMemoryOperation(&blocks -> segments [result], 2, NULL);
                                 blocks -> segments [result] = NULL;
+                                result = 0;
                                 break;
                             }
                         }
 
                        blocks -> segments [index] -> type = *type;
                        blocks -> segments [index] -> value = (gptr) holder;
-                       holder = NULL;
 
                         if (blocks -> segments [index] -> attrib & MEM_DEFVAL) {
                             blocks -> segments [index] -> attrib &= ~MEM_DEFVAL;
@@ -980,6 +980,20 @@ bool freeAll (void) {
     }
 
     return freed;
+}
+
+bool Free (gptr address) {
+    if (!address) {
+        return false;
+    }
+
+    memory holder = getMemoryByValue (address);
+
+    if (!holder) {
+        return false;
+    }
+
+    return performMemoryOperation (&holder, 2, NULL);
 }
 
 bool deallocate (memory *segment) {
@@ -1206,74 +1220,6 @@ bool disableConstFlag (memory * segment) {
 
     (*segment) -> attrib &= ~MEM_CONST;
     return true;
-}
-
-bool Free (gptr * address, enum dt type) {
-    if (!address) {
-        return false;
-    }
-
-    if (!*address) {
-        return false;
-    }
-
-    if (!isType (type)) {
-        return false;
-    }
-
-    if (type == VOID || type == GPTR) {
-        return false;
-    }
-
-    bool result = false;
-
-    switch (type) {
-        case BOOLEAN:
-        case BOOL:
-        case CAR:
-        case SCAR:
-        case CHAR:
-        case UCAR:
-        case BYTE:
-        case SSHI:
-        case USHI:
-        case SINT:
-        case UINT:
-        case SLNG:
-        case ULNG:
-        case SLLG:
-        case ULLG:
-        case SIZT:
-        case FLOT:
-        case DBLE:
-        case LDBL:
-        case STRG:
-        case STRING:
-            free (*address);
-            *address = NULL;
-            result = true;
-            break;
-        case MEM:
-        case MEMORY:
-            result = performMemoryOperation((memory *) address, 2, NULL);
-            if (result) {
-                *address = NULL;
-            }
-
-            break;
-        case ARRY:
-        case ARRAY:
-            result = termArray ((array *) address);
-            if (result) {
-                *address = NULL;
-            }
-
-            break;
-        default:
-            break;
-    }
-
-    return result;
 }
 
 bool enableMutableFlag (memory * segment) {
@@ -1725,7 +1671,8 @@ gptr Malloc (enum dt type, sizt nBlocks) {
     do {++limiter; obj = malloc ((typeLength (type) * nBlocks));} while (limiter < 3 && !obj);
 
     if (obj) {
-        blocks -> segments [index] = (memory) malloc (sizeof (struct _mem_));
+        limiter = 0;
+        do {++limiter; blocks -> segments [index] = (memory) malloc (sizeof (struct _mem_));} while (limiter < 3 && !blocks -> segments [index]);
 
         if (!blocks -> segments [index]) {
             free (obj);
@@ -1750,36 +1697,37 @@ gptr Calloc (enum dt type, sizt nBlocks) {
         return NULL;
     }
 
+    gptr obj = NULL;
     ucar limiter = 0;
-    gptr object = NULL;
     sizt index = findEmptySegment ();
 
     if (index == (sizt) -1) {
         return NULL;
     }
 
-    do {++limiter; object = malloc ((typeLength (type) * nBlocks));} while (limiter < 3 && !object);
+    do {++limiter; obj = malloc ((typeLength (type) * nBlocks));} while (limiter < 3 && !obj);
 
-    if (object) {
-        blocks -> segments [index] = (memory) malloc (sizeof (struct _mem_));
+    if (obj) {
+        limiter = 0;
+        do {++limiter; blocks -> segments [index] = (memory) malloc (sizeof (struct _mem_));} while (limiter < 3 && !blocks -> segments [index]);
 
         if (!blocks -> segments [index]) {
-            free (object);
-            object = NULL;
+            free (obj);
+            obj = NULL;
             return NULL;
         }
 
         blocks -> segments [index] -> attrib = MEM_READ | MEM_WRITE | MEM_MUTABLE | MEM_SHRINK | MEM_EXTEND;
         blocks -> segments [index] -> type = type;
-        blocks -> segments [index] -> value = object;
+        blocks -> segments [index] -> value = obj;
 
-        index = typeLength (type);
-        for (sizt iterator = 0; iterator < (index * nBlocks); ++iterator) {
-            ((byte *) object) [iterator] = 0;
+        index = (typeLength (type) * nBlocks);
+        for (sizt iterator = 0; iterator < index; ++iterator) {
+            ((byte *) obj) [iterator] = 0;
         }
     }
 
-    return object;
+    return obj;
 }
 
 memory allocate (enum dt type) {
@@ -1797,7 +1745,7 @@ memory allocate (enum dt type) {
         return NULL;
     }
 
-    blocks -> segments [index] = (memory) Malloc (sizeof (struct _mem_));
+    blocks -> segments [index] = (memory) malloc (sizeof (struct _mem_));
 
     if (!blocks -> segments [index]) {
         return NULL;
@@ -1871,7 +1819,7 @@ memory nestedAllocate (enum dt t1, enum dt t2) {
         return NULL;
     }
 
-    blocks -> segments [i1] = (memory) Malloc (sizeof (struct _mem_));
+    blocks -> segments [i1] = (memory) malloc (sizeof (struct _mem_));
 
     if (!blocks -> segments [i1]) {
         return NULL;
