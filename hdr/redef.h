@@ -60,35 +60,14 @@ extern "C" {
     typedef char * strg;
 
 #   if __x86_64__ || __x86_64 || __amd64__ || __amd64 || __aarch64__ || __ia64__ || _IA64 || __IA64__
-#       ifdef _INC_STDIO
-        typedef size_t sizt;
-#       endif //_INC_STDIO
-#       ifdef __STDIO_H
-        typedef size_t sizt;
-#       endif //__STDIO_H
-#       ifdef _STDIO_H
-        typedef size_t sizt;
-#       endif //_STDIO_H
-#       ifdef _STDIO_H_
-        typedef size_t sizt;
-#       endif //_STDIO_H_
-#       ifdef _INC_STDLIB
-        typedef size_t sizt;
-#       endif //_INC_STDLIB
-#       ifdef __STDLIB_H
-        typedef size_t sizt;
-#       endif //__STDLIB_H
-#       ifdef _STDLIB_H
-        typedef size_t sizt;
-#       endif //_STDLIB_H
-#       ifdef _STDLIB_H_
+#       if defined(_INC_STDIO) || defined(_STDIO_H_) || defined(__STDIO_H) || defined(_INC_STDLIB) || defined(_STDLIB_H_) || defined(__STDLIB_H)
         typedef size_t sizt;
 #       else
-        typedef ullg sizt;
-#       endif //_STDLIB_H_
+        typedef unsigned long long sizt;
+#       endif //if defined ...
 #   else
         typedef unsigned int sizt;
-#   endif //__x86_64__
+#   endif //if __x86_64__ ...
 
 #   if _WIN16 || _WIN32 || _WIN64 || __MSDOS__ || _MSDOS || __DOS__ || MSDOS
 #       ifndef nl

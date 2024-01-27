@@ -843,7 +843,7 @@ array initArray (sizt length, enum dt type) {
 
     if (length) {
         if (!arrayCommonOperations (&arr, 1, (gptr []) {(gptr) &type, (gptr) &length})) {
-            Free ((gptr *) &arr, ARRAY);
+            Free ((gptr) arr);
             arr = NULL;
         }
     }
